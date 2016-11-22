@@ -39,20 +39,23 @@ namespace RedditAPI
 			return jss.Deserialize<Dictionary<string, dynamic>> (getRequest (url));
 		}
 
-		public static List<Dictionary<string, dynamic>> getThread (string url) 
+		public static List<Dictionary<string, dynamic>> getThread (string url, string sort = "top", string limit = "200") 
 		{
 			JavaScriptSerializer jss = new JavaScriptSerializer ();
-			return jss.Deserialize<List<Dictionary<string, dynamic>>> (getRequest (url));
+			return jss.Deserialize<List<Dictionary<string, dynamic>>> (getRequest (url + "?sort=" + sort + "&limit=" + limit));
 		}
 
 		public static void printComments (/*List<Dictionary<string, dynamic>>*/dynamic r, int curDepth = 0, int maxDepth = -1) 
 		{
 			foreach (Dictionary<string, dynamic> c in r) {
+				try {
 				string text = indent(c ["data"] ["author"] + " | " + c ["data"] ["score"] + " karma" + "\n" +
 					c ["data"] ["body"], curDepth);
 				Console.WriteLine (text);
-				if (c ["data"] ["replies"] ["data"] ["children"].Count > 0 && c ["data"] ["replies"] ["data"] ["children"][0].GetType() != typeof(string))
-				printComments (c ["data"] ["replies"] ["data"] ["children"], curDepth + 1, maxDepth);
+				//if (c ["data"] ["replies"] ["data"] ["children"].Count > 0 && c ["data"] ["replies"] ["data"] ["children"][0].GetType() != typeof(string))
+					printComments (c ["data"] ["replies"] ["data"] ["children"], curDepth + 1, maxDepth);
+				} catch {
+				}
 			}
 		}
 
@@ -60,9 +63,53 @@ namespace RedditAPI
 		{
 			Dictionary<string, dynamic> body = r [0] ["data"] ["children"] [0] ["data"];
 			Console.WriteLine (body["title"] + " - by " + body["author"]);
+			//Console.WriteLine (body ["selftext"]);
+			Console.WriteLine(body["url"]);
 			Console.WriteLine (indent(body ["selftext"]));
 			Console.WriteLine (body ["num_comments"].ToString () + " comments.");
 			printComments (r [1]["data"]["children"]);
+		}
+
+		public static void printSub(dynamic r, int selected = 0)
+		{
+			Console.Clear ();
+			foreach (int t in Enumerable.Range(0, r.Count)) {
+				string toWrite = r [t] ["data"] ["title"] + " - by " + r [t] ["data"] ["author"];
+				if (t == selected) {
+					ConsoleColor prevFore = Console.ForegroundColor;
+					ConsoleColor prevBack = Console.BackgroundColor;
+					Console.ForegroundColor = (ConsoleColor)Math.Abs ((int)prevFore - 7);
+					Console.BackgroundColor = (ConsoleColor)Math.Abs ((int)prevBack - 7);
+					Console.WriteLine (toWrite);
+					Console.ForegroundColor = prevFore;
+					Console.BackgroundColor = prevBack;
+				} else {
+					Console.WriteLine (toWrite);
+				}
+			}
+		}
+
+		public static void selectThread (string sub, string sort = "top", string limit = "25")
+		{
+			Dictionary<string, dynamic> r = getSub (Constants.SUB + sub + ".json" + "?sort=" + sort + "&limit=" + limit);
+			/*List<Dictionary<string, dynamic>>*/dynamic threads = r ["data"] ["children"];
+			printSub (threads);
+
+			int selected = 0;
+			ConsoleKey k = ConsoleKey.Spacebar;
+			while (k != ConsoleKey.Enter) {
+				k = Console.ReadKey ().Key;
+				if (k == ConsoleKey.DownArrow) {
+					selected = Math.Min (selected + 1, threads.Count - 1);
+					printSub (threads, selected);
+				} else if (k == ConsoleKey.UpArrow) {
+					selected = Math.Max (selected - 1, 0);
+					printSub (threads, selected);
+				}
+			}
+			Console.Clear ();
+			printThread(getThread(Constants.SUB + sub + "/comments/" +
+				threads[selected]["data"]["id"] + ".json"));
 		}
 
 		public static string indent (string s, int n = 0, int baseIndent = 4) {
@@ -75,9 +122,18 @@ namespace RedditAPI
 			} else {
 				int length = Console.BufferWidth - n * baseIndent;
 				string ind = new String (' ', baseIndent * n);
-				while (s != "" && s != ".") {
+				while (s != "" && s != "." && s != ":" && s != ")") {
+					//Console.WriteLine (s); //DEBUG
 					int index = (s.Length <= length) ?
-						s.Length - 1 : Math.Max(s.LastIndexOf (' ', length - 1), s.LastIndexOf('.', length - 1));
+						s.Length - 1 : Math.Max (
+						            Math.Max (
+							            Math.Max (
+								            s.LastIndexOf (' ', length - 1),
+								            s.LastIndexOf ('.', length - 1)),
+							            s.LastIndexOf (':', length - 1)),
+						            s.LastIndexOf (')', length - 1));
+					if (index == -1)
+						index = length - 1;
 					r += ind + s.Substring (0, index + 1) + "\n";
 					s = s.Remove (0, index + 1);
 				}
@@ -89,8 +145,9 @@ namespace RedditAPI
 		{
 			Console.Write ("Choose a subreddit: ");
 			string sub = Console.ReadLine ();
-			List<Dictionary<string, dynamic>> r = getThread (Constants.SUB + sub + ".json");
-			printThread (r);
+			selectThread (sub);
+			//List<Dictionary<string, dynamic>> r = getThread (Constants.SUB + sub + ".json");
+			//printThread (r);
 		}
 	}
 }
