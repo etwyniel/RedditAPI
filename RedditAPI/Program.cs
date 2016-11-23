@@ -24,6 +24,7 @@ namespace RedditAPI
 			string text;
 
 			HttpWebRequest r = (HttpWebRequest)WebRequest.Create (url);
+			r.UserAgent = "etwyniel";
 			r.Method = WebRequestMethods.Http.Get;
 			r.Accept = "application/json";
 			WebResponse resp = r.GetResponse ();
@@ -112,7 +113,7 @@ namespace RedditAPI
 				threads[selected]["data"]["id"] + ".json"));
 		}
 
-		public static string indent (string s, int n = 0, int baseIndent = 4) {
+		public static string indent (string s, int n = 0, int baseIndent = 2) {
 			string r = "";
 			if (s.Contains ('\n')) {
 				foreach (string sub in s.Split ('\n')) {
@@ -120,6 +121,11 @@ namespace RedditAPI
 				}
 				return r;
 			} else {
+				if (s.StartsWith ("&gt;")) {
+					n++;
+					s = s.Remove (0, 4);
+					s = "|" + s;//"“" + s + "”";
+				}
 				int length = Console.BufferWidth - n * baseIndent;
 				string ind = new String (' ', baseIndent * n);
 				while (s != "" && s != "." && s != ":" && s != ")") {
@@ -143,9 +149,13 @@ namespace RedditAPI
 
 		public static void Main (string[] args)
 		{
-			Console.Write ("Choose a subreddit: ");
-			string sub = Console.ReadLine ();
-			selectThread (sub);
+			if (args.Length > 0) {
+				selectThread (args [0]);
+			} else {
+				Console.Write ("Choose a subreddit: ");
+				string sub = Console.ReadLine ();
+				selectThread (sub);
+			}
 			//List<Dictionary<string, dynamic>> r = getThread (Constants.SUB + sub + ".json");
 			//printThread (r);
 		}
